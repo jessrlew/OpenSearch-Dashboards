@@ -2,6 +2,7 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
+@import "@elastic/eui/src/components/table/variables";
 
 .exploreSpanDetailTable {
   &__hierarchyCell {
@@ -18,4 +19,13 @@
     visibility: hidden;
     margin-right: 5px;
   }
+}
+
+.exploreSpanDetailSelectedCell {
+  background-color: $ouiTableHoverSelectedColor !important;
+}
+
+.exploreSpanDetailTableCell {
+  width: 100%;
+  text-align: left;
 }

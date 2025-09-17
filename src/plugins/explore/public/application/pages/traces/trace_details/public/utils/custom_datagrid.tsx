@@ -9,6 +9,7 @@ import {
   EuiDataGrid,
   EuiDataGridColumn,
   EuiDataGridSorting,
+  EuiDataGridStyle,
   EuiLoadingSpinner,
   EuiOverlayMask,
 } from '@elastic/eui';
@@ -75,6 +76,7 @@ interface RenderCustomDataGridParams {
   defaultHeight?: string;
   visibleColumns?: string[];
   isTableDataLoading?: boolean;
+  gridStyleOverride?: Partial<EuiDataGridStyle>;
 }
 
 export const RenderCustomDataGrid: React.FC<RenderCustomDataGridParams> = ({
@@ -89,6 +91,7 @@ export const RenderCustomDataGrid: React.FC<RenderCustomDataGridParams> = ({
   defaultHeight = '500px',
   visibleColumns,
   isTableDataLoading,
+  gridStyleOverride = {},
 }) => {
   const defaultVisibleColumns = useMemo(() => {
     return columns
@@ -142,8 +145,9 @@ export const RenderCustomDataGrid: React.FC<RenderCustomDataGridParams> = ({
       fontSize: 's' as const,
       cellPadding: 's' as const,
       footer: 'overline' as const,
+      ...gridStyleOverride,
     }),
-    []
+    [gridStyleOverride]
   );
 
   return (

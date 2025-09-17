@@ -4,7 +4,14 @@
  */
 /* eslint-disable react-hooks/exhaustive-deps */
 
-import { EuiButtonEmpty, EuiDataGridColumn, EuiIcon, EuiLink, EuiText } from '@elastic/eui';
+import {
+  EuiButton,
+  EuiButtonEmpty,
+  EuiDataGridColumn,
+  EuiIcon,
+  EuiLink,
+  EuiText,
+} from '@elastic/eui';
 import { i18n } from '@osd/i18n';
 import moment from 'moment';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -48,6 +55,7 @@ interface SpanDetailTableProps {
     field: string;
     value: any;
   }>;
+  selectedSpanId?: string;
 }
 
 interface Span {
@@ -130,23 +138,53 @@ const getColumns = (): EuiDataGridColumn[] => [
   },
 ];
 
-const renderSpanCellValue = ({
-  rowIndex,
-  columnId,
-  items,
-  tableParams,
-  disableInteractions,
-  props,
-}: {
+interface SpanCellProps {
   rowIndex: number;
   columnId: string;
   items: ParsedHit[];
   tableParams: { page: number; size: number };
   disableInteractions: boolean;
   props: SpanDetailTableProps;
+  setCellProps?: (props: any) => void;
+  selectedSpanId?: string;
+}
+
+const SpanCell: React.FC<SpanCellProps> = ({
+  rowIndex,
+  columnId,
+  items,
+  tableParams,
+  disableInteractions,
+  props,
+  setCellProps,
+  selectedSpanId,
 }) => {
   const adjustedRowIndex = rowIndex - tableParams.page * tableParams.size;
   const item = items[adjustedRowIndex];
+
+  useEffect(() => {
+    if (selectedSpanId && selectedSpanId === item.spanId && !disableInteractions) {
+      setCellProps?.({ className: 'exploreSpanDetailSelectedCell' });
+    } else {
+      setCellProps?.({});
+    }
+  }, [selectedSpanId, item, setCellProps, disableInteractions]);
+
+  return disableInteractions ? (
+    <SpanCellContent item={item} columnId={columnId} />
+  ) : (
+    <button className="exploreSpanDetailTableCell" onClick={() => props.openFlyout(item.spanId)}>
+      <SpanCellContent item={item} columnId={columnId} />
+    </button>
+  );
+};
+
+interface SpanCellContentProps {
+  item: Span;
+  columnId: string;
+}
+
+const SpanCellContent: React.FC<SpanCellContentProps> = ({ columnId, item }) => {
   if (!item) return '-';
 
   const value = item[columnId];
@@ -164,13 +202,7 @@ const renderSpanCellValue = ({
         })
       );
     case 'spanId':
-      return disableInteractions ? (
-        <span>{value}</span>
-      ) : (
-        <EuiLink data-test-subj="spanId-link" onClick={() => props.openFlyout(value)}>
-          {value}
-        </EuiLink>
-      );
+      return <span>{value}</span>;
     case 'durationInNanos':
       return `${round(nanoToMilliSec(Math.max(0, extractSpanDuration(item))), 2)} ms`;
     case 'startTime':
@@ -265,16 +297,19 @@ export function SpanDetailTable(props: SpanDetailTableProps) {
 
   const columns = useMemo(() => getColumns(), []);
   const renderCellValue = useCallback(
-    ({ rowIndex, columnId, disableInteractions }) =>
-      renderSpanCellValue({
-        rowIndex,
-        columnId,
-        items,
-        tableParams,
-        disableInteractions,
-        props,
-      }),
-    [items]
+    ({ rowIndex, columnId, disableInteractions, setCellProps }) => (
+      <SpanCell
+        rowIndex={rowIndex}
+        columnId={columnId}
+        items={items}
+        tableParams={tableParams}
+        disableInteractions={disableInteractions}
+        props={props}
+        setCellProps={setCellProps}
+        selectedSpanId={props.selectedSpanId}
+      />
+    ),
+    [items, props.selectedSpanId]
   );
 
   const visibleColumns = useMemo(
@@ -411,14 +446,23 @@ export function SpanDetailTableHierarchy(props: SpanDetailTableProps) {
   };
 
   const renderCellValue = useCallback(
-    ({ rowIndex, columnId, disableInteractions }) => {
+    ({ rowIndex, columnId, disableInteractions, setCellProps }) => {
       const item = flattenedItems[rowIndex];
       const value = item[columnId];
 
       if (columnId === 'serviceName') {
         const indentation = `${(item.level || 0) * 20}px`;
         const isExpanded = expandedRows.has(item.spanId);
-        return (
+        const isRowSelected =
+          props.selectedSpanId && props.selectedSpanId === item.spanId && !disableInteractions;
+
+        if (isRowSelected) {
+          setCellProps?.({ className: ['treeCell--firstColumn', 'exploreSpanDetailSelectedCell'] });
+        } else {
+          setCellProps({ className: ['treeCell--firstColumn'] });
+        }
+
+        const cellContent = (
           <div
             className="exploreSpanDetailTable__hierarchyCell"
             style={{ paddingLeft: indentation }}
@@ -446,28 +490,26 @@ export function SpanDetailTableHierarchy(props: SpanDetailTableProps) {
             <span>{resolveServiceNameFromSpan(item) || value || '-'}</span>
           </div>
         );
-      } else if (columnId === 'spanId') {
+
         return disableInteractions ? (
-          <span>{value}</span>
+          cellContent
         ) : (
-          <EuiLink
-            onClick={() => openFlyout(item.spanId)}
-            color="primary"
-            data-test-subj="spanId-flyout-button"
-          >
-            {value}
-          </EuiLink>
+          <button onClick={() => openFlyout(item.spanId)}>{cellContent}</button>
         );
       }
 
-      return renderSpanCellValue({
-        rowIndex,
-        columnId,
-        items: flattenedItems,
-        tableParams: { page: 0, size: flattenedItems.length },
-        disableInteractions,
-        props,
-      });
+      return (
+        <SpanCell
+          rowIndex={rowIndex}
+          columnId={columnId}
+          items={flattenedItems}
+          tableParams={{ page: 0, size: flattenedItems.length }}
+          disableInteractions={disableInteractions}
+          props={props}
+          setCellProps={setCellProps}
+          selectedSpanId={props.selectedSpanId}
+        />
+      );
     },
     [flattenedItems, expandedRows, openFlyout]
   );
@@ -508,5 +550,6 @@ export function SpanDetailTableHierarchy(props: SpanDetailTableProps) {
     availableWidth,
     visibleColumns,
     isTableDataLoading: isSpansTableDataLoading,
+    gridStyleOverride: { rowHover: 'highlight' },
   });
 }
